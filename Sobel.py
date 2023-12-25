@@ -19,38 +19,38 @@ def gammaCorrection(src, gamma):
 
 
 
-def prepare(img):
+def prepareimage(img):
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGRA2GRAY)
 
-    filtered = cv2.medianBlur(gray, 5)
+    f = cv2.medianBlur(gray, 5)
 
     clahe = cv2.createCLAHE(clipLimit=10.0, tileGridSize=(8, 8))
 
-    clahe_img = clahe.apply(filtered)
+    clahe_img1 = clahe.apply(f)
 
-    return clahe_img
+    return clahe_img1
 
 
-def find_rect(masked_frame): 
+def find_rect1(mask_frame): 
 
-    gray = cv2.cvtColor(masked_frame, cv2.COLOR_BGRA2GRAY)
+    gray = cv2.cvtColor(mask_frame, cv2.COLOR_BGRA2GRAY)
 
     ret1, threshold = cv2.threshold(gray, 1, 255, cv2.THRESH_OTSU)
 
     contours, _ = cv2.findContours(threshold, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     rectangles = [cv2.boundingRect(cnt) for cnt in contours]
-    coord_rectangles = []
+    coord = []
 
     for rect in rectangles:
-        coord_rectangles.append(rect)
-        cv2.rectangle(masked_frame, (rect[0], rect[1]), (rect[0] + rect[2], rect[1] + rect[3]), (0, 255, 0), 2)
+        coord.append(rect)
+        cv2.rectangle(mask_frame, (rect[0], rect[1]), (rect[0] + rect[2], rect[1] + rect[3]), (0, 255, 0), 2)
 
-    cv2.imshow('Rectangles', masked_frame)
+    cv2.imshow('Rectangles', mask_frame)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
-    return coord_rectangles
+    return coord
 
 
 def Sobel_segment(clahe_img, cord, img1):
@@ -86,7 +86,7 @@ def Sobel_segment(clahe_img, cord, img1):
     return img1
 
 
-def poisk(img, h, dispersia, b):  
+def poisk1(img, h, dispersia, b):  
 
     disp = []  
     disp_cord = []
@@ -118,22 +118,22 @@ path_to_frames = 'C:\\anaconda 3\\test2\\2\\'
 masked_first_frame = cv2.imread('C:\\anaconda 3\\test2\\masked\\1.png') 
 path_to_folder = 'C:\\anaconda 3\\test2\\Sobel\\' 
 
-cord = find_rect(masked_first_frame)  
+cord = find_rect1(masked_first_frame)  
 
 
 frames = os.listdir(path_to_frames)
 
 img1 = cv2.imread(path_to_frames + 'frame0.jpg')  
-clahe_img = prepare(img1)
+clahe_img = prepareimage(img1)
 dispers1 = np.var(img1[cord[0][1]:cord[0][1] + cord[0][3], cord[0][0]:cord[0][0] + cord[0][2]])  
 dispers2 = np.var(img1[cord[1][1]:cord[1][1] + cord[1][3], cord[1][0]:cord[1][0] + cord[1][2]])  
 
 for i in range(1, len(frames)):
 
     img1 = cv2.imread(path_to_frames + 'frame'+str(i)+'.jpg')
-    clahe_img = prepare(img1) 
-    x1, y1, dispers1 = poisk(clahe_img, cord[0], dispers1, 5) 
-    x2, y2, dispers2 = poisk(clahe_img, cord[1], dispers2, 5) 
+    clahe_img = prepareimage(img1) 
+    x1, y1, dispers1 = poisk1(clahe_img, cord[0], dispers1, 5) 
+    x2, y2, dispers2 = poisk1(clahe_img, cord[1], dispers2, 5) 
 
     cord = [(x1, y1, cord[0][2], cord[0][3]), (x2, y2, cord[1][2], cord[1][3] )]
 
@@ -143,7 +143,7 @@ for i in range(1, len(frames)):
 
 # тут видео собираю
 
-output_video = 'C:\\anaconda 3\\test2\\Sobel\\result12.mp4'
+output_video = 'C:\\anaconda 3\\test2\\Sobel\\result13.mp4'
 
 first_image = cv2.imread(os.path.join(path_to_folder , os.listdir(path_to_folder )[0]))
 height, width, _ = first_image.shape
