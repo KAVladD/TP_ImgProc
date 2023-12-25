@@ -10,6 +10,12 @@ import numpy as np
 import os
 from matplotlib import pyplot as plt
 
+masks = [[0], [0]]
+
+params = [3, 1] # Kernel and scale
+
+n = 2
+
 def gammaCorrection(src, gamma):
     invGamma = 1 / gamma
 
@@ -53,26 +59,27 @@ def find_rect1(mask_frame):
     return coord
 
 
-def Sobel_segment(clahe_img, cord, img1):
+def Sobel_segment(clahe_img, cord, img1, params):
     ret1, bin_img = cv2.threshold(clahe_img, 100, 255, cv2.THRESH_OTSU)
     kernel = np.ones((5, 5), np.uint8)
 
-    scale = 1
+   
     delta = 0
     ddepth = cv2.CV_16S
 
-    grad_x = cv2.Sobel(bin_img, ddepth, 1,0, ksize = 3, scale = scale, delta = delta, borderType = cv2.BORDER_DEFAULT)
-    grad_y = cv2.Sobel(bin_img, ddepth, 0,1, ksize = 3, scale = scale, delta = delta, borderType = cv2.BORDER_DEFAULT)
+    grad_x = cv2.Sobel(bin_img, ddepth, 1,0, params, delta = delta, borderType = cv2.BORDER_DEFAULT)
+    grad_y = cv2.Sobel(bin_img, ddepth, 0,1, params, delta = delta, borderType = cv2.BORDER_DEFAULT)
 
     Abs_grad_x= cv2.convertScaleAbs(grad_x)
     Abs_grad_y= cv2.convertScaleAbs(grad_y)
     Sobel1 = cv2.addWeighted(Abs_grad_x, 0.5, Abs_grad_x, 0.5,0)
-
+    mask = np.ones_like(img1)
 
 
     for i in cord:
         outputSobel = cv2.dilate(Sobel1, kernel, iterations=2)
         contours, hierarchy = cv2.findContours( outputSobel, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
 
         
         for contour in contours:
@@ -83,7 +90,7 @@ def Sobel_segment(clahe_img, cord, img1):
                 #cv2.drawContours(img1[i[1]:i[1] + i[3], i[0]:i[0] + i[2]], [approx], 0, (0, 0, 255), 2)
 
 
-    return img1
+    return mask
 
 
 def poisk1(img, h, dispersia, b):  
@@ -143,7 +150,7 @@ for i in range(1, len(frames)):
 
 # тут видео собираю
 
-output_video = 'C:\\anaconda 3\\test2\\Sobel\\result13.mp4'
+output_video = 'C:\\anaconda 3\\test2\\Sobel\\result14.mp4'
 
 first_image = cv2.imread(os.path.join(path_to_folder , os.listdir(path_to_folder )[0]))
 height, width, _ = first_image.shape
