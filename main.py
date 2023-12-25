@@ -10,7 +10,7 @@ mask_names = ['', '']
 #read true masks
 masks = [[0], [0]]
 
-params = [(10, 150), 0.001]
+params = [(10, 150), 0.001] # для алгоритма canny
 
 n = 2
 
@@ -23,11 +23,7 @@ def prepare(img):
     clahe = cv2.createCLAHE(clipLimit=10.0, tileGridSize=(8, 8))
 
     clahe_img = clahe.apply(filtered)
-    # cv2.imshow('filt', filtered)
-    # cv2.imshow('clahe',clahe_img)
-    # cv2.imshow('gr', gray)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
+
     return clahe_img
 
 
@@ -56,12 +52,7 @@ def canny_segment(clahe_img, cord, img1, params):
     ret1, bin_img = cv2.threshold(clahe_img, 100, 255, cv2.THRESH_OTSU)
     kernel = np.ones((5, 5), np.uint8)
 
-
-    # dilateCanny = cv2.dilate(outputCanny, kernel, iterations=3)
-
-    # morph_img = cv2.morphologyEx(bin_img, cv2.MORPH_GRADIENT, kernel)
-
-    # morph_img = cv2.morphologyEx(morph_img, cv2.MORPH_CLOSE, kernel, iterations=1)
+    mask = np.ones_like(img1)
 
     for i in cord:
         outputCanny = cv2.Canny(bin_img[i[1]:i[1] + i[3], i[0]:i[0] + i[2]], params[0][0], params[0][1])
@@ -69,20 +60,14 @@ def canny_segment(clahe_img, cord, img1, params):
         outputCanny = cv2.dilate(outputCanny, kernel, iterations=2)
         contours, hierarchy = cv2.findContours( outputCanny, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        # cv2.imshow('dil', outputCanny)
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
-
         # Замкнуть незамкнутые контуры
         for contour in contours:
             if not cv2.isContourConvex(contour):
                 epsilon = params[1] * cv2.arcLength(contour, True) # апроксимация контуров
                 approx = cv2.approxPolyDP(contour, epsilon, True)
-                cv2.fillPoly(img1[i[1]:i[1] + i[3], i[0]:i[0] + i[2]], [approx], (0, 0, 255))
-                #cv2.drawContours(img1[i[1]:i[1] + i[3], i[0]:i[0] + i[2]], [approx], 0, (0, 0, 255), 2)
-
-
-    return img1
+                cv2.fillPoly(mask[i[1]:i[1] + i[3], i[0]:i[0] + i[2]], [approx], (0, 0, 255))
+                # cv2.drawContours(img1[i[1]:i[1] + i[3], i[0]:i[0] + i[2]], [approx], 0, (0, 0, 255), 2)
+    return mask
 
 
 def poisk(img, h, dispersia, b):  # функция ищет положение области интереса для следующего кадра
@@ -129,25 +114,23 @@ def video_process_canny(frames, params, masked_first_frame):
     video = []
 
     cord = find_rect(masked_first_frame)
-    img1 = frames[0].copy  # считываю первый кадр
+    img1 = frames[0].copy()  # считываю первый кадр
     clahe_img = prepare(img1)
     dispers1 = np.var(
-        img1[cord[0][1]:cord[0][1] + cord[0][3], cord[0][0]:cord[0][0] + cord[0][2]])  # дисперсия для первого кадра
+        img1[cord[0][1]:cord[0][1] + cord[0][3], cord[0][0]:cord[0][0] + cord[0][2]])  # дисперсия для первой области
     dispers2 = np.var(
-        img1[cord[1][1]:cord[1][1] + cord[1][3], cord[1][0]:cord[1][0] + cord[1][2]])  # дисперсия для второго кадра
+        img1[cord[1][1]:cord[1][1] + cord[1][3], cord[1][0]:cord[1][0] + cord[1][2]])  # дисперсия для второй области
 
     for i in range(0, len(frames)):
-        img1 = frames[i]
+        img1 = frames[i].copy()
         clahe_img = prepare(img1)  # тут делаем эквализацию и тд
-        x1, y1, dispers1 = poisk(clahe_img, cord[0], dispers1,
-                                 5)  # получаем положение окна и значение дисперсии для области 1
-        x2, y2, dispers2 = poisk(clahe_img, cord[1], dispers2,
-                                 5)  # получаем положение окна и значение дисперсии для области 2
+        x1, y1, dispers1 = poisk(clahe_img, cord[0], dispers1, 5)  # получаем положение окна и значение дисперсии для области 1
+        x2, y2, dispers2 = poisk(clahe_img, cord[1], dispers2, 5)  # получаем положение окна и значение дисперсии для области 2
 
         cord = [(x1, y1, cord[0][2], cord[0][3]), (x2, y2, cord[1][2], cord[1][3])]
 
-        canny = canny_segment(clahe_img, cord, img1, params)
-        video.append(canny)
+        mask = canny_segment(clahe_img, cord, img1, params)
+        video.append(mask)
     return video
 
 
