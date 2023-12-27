@@ -49,7 +49,7 @@ def frame_false_pos(true_mask, mask):
     
     mask = mask[mask != true_mask]
     
-    return len(mask == 1) / true
+    return np.sum(mask == 1) / true
 
 def frame_false_neg(true_mask, mask):
     
@@ -62,7 +62,7 @@ def frame_false_neg(true_mask, mask):
     
     mask = mask[mask != true_mask]
     
-    return len(mask == 0) / true
+    return (len(mask) - np.sum(mask == 1)) / true
 
 def frame_IoU(true_mask, mask):
     

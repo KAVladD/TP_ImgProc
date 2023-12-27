@@ -1,20 +1,8 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Dec 25 14:07:13 2023
-
-@author: Полина
-"""
-
 import cv2
 import numpy as np
 import os
 from matplotlib import pyplot as plt
 
-masks = [[0], [0]]
-
-params = [3, 1] # Kernel and scale
-
-n = 2
 
 def gammaCorrection(src, gamma):
     invGamma = 1 / gamma
@@ -22,8 +10,6 @@ def gammaCorrection(src, gamma):
     table = [((i / 255) ** invGamma) * 255 for i in range(256)]
     table = np.array(table, np.uint8)
     return cv2.LUT(src, table)
-
-
 
 def prepareimage(img):
 
@@ -36,7 +22,6 @@ def prepareimage(img):
     clahe_img1 = clahe.apply(f)
 
     return clahe_img1
-
 
 def find_rect1(mask_frame): 
 
@@ -53,51 +38,53 @@ def find_rect1(mask_frame):
         coord.append(rect)
         cv2.rectangle(mask_frame, (rect[0], rect[1]), (rect[0] + rect[2], rect[1] + rect[3]), (0, 255, 0), 2)
 
-    cv2.imshow('Rectangles', mask_frame)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    # cv2.imshow('Rectangles', mask_frame)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
     return coord
-
 
 def Sobel_segment(clahe_img, cord, img1, params):
     ret1, bin_img = cv2.threshold(clahe_img, 100, 255, cv2.THRESH_OTSU)
     kernel = np.ones((5, 5), np.uint8)
-
-   
+  
     delta = 0
     ddepth = cv2.CV_16S
+    
+    grad_x = np.array([])
+    grad_y = np.array([])
 
-    grad_x = cv2.Sobel(bin_img, ddepth, 1,0, params, delta = delta, borderType = cv2.BORDER_DEFAULT)
-    grad_y = cv2.Sobel(bin_img, ddepth, 0,1, params, delta = delta, borderType = cv2.BORDER_DEFAULT)
+    grad_x = cv2.Sobel(bin_img, ddepth, 1,0, grad_x,
+                       params[0], params[1], delta = delta, 
+                       borderType = cv2.BORDER_DEFAULT)
+    grad_y = cv2.Sobel(bin_img, ddepth, 0,1, grad_y,
+                       params[0], params[1], delta = delta, 
+                       borderType = cv2.BORDER_DEFAULT)
+    
+    
 
     Abs_grad_x= cv2.convertScaleAbs(grad_x)
     Abs_grad_y= cv2.convertScaleAbs(grad_y)
-    Sobel1 = cv2.addWeighted(Abs_grad_x, 0.5, Abs_grad_x, 0.5,0)
+    Sobel1 = cv2.addWeighted(Abs_grad_x, 0.5, Abs_grad_y, 0.5,0)
     mask = np.ones_like(img1)
-
+    
+    
 
     for i in cord:
         outputSobel = cv2.dilate(Sobel1, kernel, iterations=2)
         contours, hierarchy = cv2.findContours( outputSobel, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-
-        
+       
         for contour in contours:
             if not cv2.isContourConvex(contour):
-                epsilon = 0.01 * cv2.arcLength(contour, True)
+                epsilon = 0.0001 * cv2.arcLength(contour, True)
                 approx = cv2.approxPolyDP(contour, epsilon, True)
-                cv2.fillPoly(img1[i[1]:i[1] + i[3], i[0]:i[0] + i[2]], [approx], (0, 0, 255))
+                cv2.fillPoly(mask[i[1]:i[1] + i[3], i[0]:i[0] + i[2]], [approx], (0, 0, 255))
                 #cv2.drawContours(img1[i[1]:i[1] + i[3], i[0]:i[0] + i[2]], [approx], 0, (0, 0, 255), 2)
-
-
     return mask
-
 
 def poisk1(img, h, dispersia, b):  
 
     disp = []  
     disp_cord = []
-
 
     for y in range(img[h[1]-b:h[1] + h[3]+b, h[0]-b:h[0] + h[2]+b].shape[0]):
         if y + h[3] > img[h[1]-b:h[1] + h[3]+b, h[0]-b:h[0] + h[2]+b].shape[0]:  # проверка на выход за край по вертикали
@@ -112,56 +99,32 @@ def poisk1(img, h, dispersia, b):
 
     result_dispers, result_index = find_closest_value(disp, dispersia)
 
-
     return disp_cord[result_index][0]-b+h[0], disp_cord[result_index][1]-b+h[1], result_dispers
-
 
 def find_closest_value(numbers, target):
     closest_value = min(numbers, key=lambda x: abs(x - target))
     closest_index = numbers.index(closest_value)
     return closest_value, closest_index
 
-path_to_frames = 'C:\\anaconda 3\\test2\\2\\' 
-masked_first_frame = cv2.imread('C:\\anaconda 3\\test2\\masked\\1.png') 
-path_to_folder = 'C:\\anaconda 3\\test2\\Sobel\\' 
+def video_process_sobel(frames, params, masked_first_frame):
+    video = []
 
-cord = find_rect1(masked_first_frame)  
+    cord = find_rect1(masked_first_frame)
+    img1 = frames[0].copy()  # считываю первый кадр
+    clahe_img = prepareimage(img1)
+    dispers1 = np.var(
+        img1[cord[0][1]:cord[0][1] + cord[0][3], cord[0][0]:cord[0][0] + cord[0][2]])  # дисперсия для первой области
+    dispers2 = np.var(
+        img1[cord[1][1]:cord[1][1] + cord[1][3], cord[1][0]:cord[1][0] + cord[1][2]])  # дисперсия для второй области
 
+    for i in range(0, len(frames)):
+        img1 = frames[i].copy()
+        clahe_img = prepareimage(img1)  # тут делаем эквализацию и тд
+        x1, y1, dispers1 = poisk1(clahe_img, cord[0], dispers1, 5)  # получаем положение окна и значение дисперсии для области 1
+        x2, y2, dispers2 = poisk1(clahe_img, cord[1], dispers2, 5)  # получаем положение окна и значение дисперсии для области 2
 
-frames = os.listdir(path_to_frames)
+        cord = [(x1, y1, cord[0][2], cord[0][3]), (x2, y2, cord[1][2], cord[1][3])]
 
-img1 = cv2.imread(path_to_frames + 'frame0.jpg')  
-clahe_img = prepareimage(img1)
-dispers1 = np.var(img1[cord[0][1]:cord[0][1] + cord[0][3], cord[0][0]:cord[0][0] + cord[0][2]])  
-dispers2 = np.var(img1[cord[1][1]:cord[1][1] + cord[1][3], cord[1][0]:cord[1][0] + cord[1][2]])  
-
-for i in range(1, len(frames)):
-
-    img1 = cv2.imread(path_to_frames + 'frame'+str(i)+'.jpg')
-    clahe_img = prepareimage(img1) 
-    x1, y1, dispers1 = poisk1(clahe_img, cord[0], dispers1, 5) 
-    x2, y2, dispers2 = poisk1(clahe_img, cord[1], dispers2, 5) 
-
-    cord = [(x1, y1, cord[0][2], cord[0][3]), (x2, y2, cord[1][2], cord[1][3] )]
-
-
-    Sobel = Sobel_segment(clahe_img, cord, img1)
-    cv2.imwrite(path_to_folder+ 'frame'+str(i)+'.jpg', Sobel)
-
-# тут видео собираю
-
-output_video = 'C:\\anaconda 3\\test2\\Sobel\\result14.mp4'
-
-first_image = cv2.imread(os.path.join(path_to_folder , os.listdir(path_to_folder )[0]))
-height, width, _ = first_image.shape
-
-fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-fps = 30
-video_writer = cv2.VideoWriter(output_video, fourcc, fps, (width, height))
-
-for image_name in os.listdir(path_to_folder ):
-    image_path = os.path.join(path_to_folder , image_name)
-    image = cv2.imread(image_path)
-    video_writer.write(image)
-
-video_writer.release()
+        mask = Sobel_segment(clahe_img, cord, img1, params)
+        video.append(mask)
+    return video
